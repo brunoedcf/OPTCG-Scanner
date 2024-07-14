@@ -21,8 +21,6 @@ export default function HomeScreen() {
       quality: 1,
     });
 
-    console.log(result);
-
     if (!result.canceled) {
       navigation.navigate("Loading", { photoUri: result.assets[0].uri });
     } else {
