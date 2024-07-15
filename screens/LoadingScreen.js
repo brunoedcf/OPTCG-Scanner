@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ImageBackground,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 
@@ -32,7 +39,7 @@ export default function LoadingScreen({ route }) {
         );
 
         if (!classifyResponse.data) {
-          throw new Error("Classificação da carta falhou.");
+          throw new Error("Card detection failed.");
         }
 
         // Chamar a API do FastAPI PyMongo para obter os detalhes da carta
@@ -50,10 +57,11 @@ export default function LoadingScreen({ route }) {
         navigation.navigate("Result", {
           cardData: cardResponse.data,
           takenPhoto: photoUri,
+          confidence: classifyResponse.data["confidence"],
         });
       } catch (error) {
         console.error("Error fetching data:", error);
-        Alert.alert("Erro", "Não foi possível classificar a carta.");
+        Alert.alert("Erro", "Card detection failed.");
         navigation.navigate("Home");
       } finally {
         setLoading(false);
@@ -64,18 +72,32 @@ export default function LoadingScreen({ route }) {
   }, [navigation, photoUri]);
 
   return (
-    <View style={styles.container}>
-      {loading ? (
-        <>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.loadingText}>Processando...</Text>
-        </>
-      ) : null}
-    </View>
+    <ImageBackground
+      source={require("../assets/background.png")}
+      style={styles.background}
+      imageStyle={styles.backgroundImage}
+    >
+      <View style={styles.container}>
+        {loading ? (
+          <>
+            <ActivityIndicator size="large" color="#0000ff" />
+            <Text style={styles.loadingText}></Text>
+          </>
+        ) : null}
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backgroundImage: {
+    opacity: 0.1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
