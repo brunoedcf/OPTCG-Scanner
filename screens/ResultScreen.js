@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,15 +6,26 @@ import {
   StyleSheet,
   Image,
   Linking,
-  ScrollView,
   ImageBackground,
+  ScrollView,
+  Dimensions,
 } from "react-native";
+import { format } from 'date-fns';
+
+const { width } = Dimensions.get("window");
 
 export default function ResultScreen({ route, navigation }) {
-  const { cardData, takenPhoto, confidence } = route.params;
+  const { cardDetails } = route.params;
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  const handlePress = () => {
-    Linking.openURL(cardData.card.link_marketplace);
+  const onScroll = (event) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const activePage = Math.round(scrollPosition / width);
+    setActiveIndex(activePage);
+  };
+
+  const handlePress = (link) => {
+    Linking.openURL(link);
   };
 
   const getConfidenceTextAndStyle = (confidence) => {
@@ -30,9 +41,9 @@ export default function ResultScreen({ route, navigation }) {
     }
   };
 
-  const { confidenceText, confidenceStyle } = getConfidenceTextAndStyle(
-    parseFloat(confidence)
-  );
+  const totalLowestPrice = cardDetails
+    .reduce((sum, cardData) => sum + cardData.card.lowest_price, 0)
+    .toFixed(2);
 
   return (
     <ImageBackground
@@ -40,50 +51,85 @@ export default function ResultScreen({ route, navigation }) {
       style={styles.background}
       imageStyle={styles.backgroundImage}
     >
-      <View style={styles.container}>
-        <View style={styles.confidenceContainer}>
-          <Text style={styles.confidenceTitle}>Confidence: </Text>
-          <Text style={confidenceStyle}>{confidenceText}</Text>
-        </View>
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={true}
-          style={styles.scrollView}
-          bounces
-        >
-          <Image
-            source={{ uri: "https://" + cardData.card.image }}
-            style={styles.image}
+      <ScrollView
+        horizontal
+        pagingEnabled
+        snapToAlignment="center"
+        decelerationRate="fast"
+        contentContainerStyle={styles.scrollContainer}
+        showsHorizontalScrollIndicator={false}
+        disableIntervalMomentum
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        {cardDetails.map((cardData, index) => (
+          <View key={index} style={styles.container}>
+            <View style={styles.confidenceContainer}>
+              <Text style={styles.confidenceTitle}>Confidence: </Text>
+              <Text
+                style={
+                  getConfidenceTextAndStyle(parseFloat(cardData.confidence))
+                    .confidenceStyle
+                }
+              >
+                {
+                  getConfidenceTextAndStyle(parseFloat(cardData.confidence))
+                    .confidenceText
+                }
+              </Text>
+            </View>
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: "https://" + cardData.card.image }}
+                style={styles.image}
+              />
+            </View>
+            <View style={styles.infoContainer}>
+              <Text style={styles.info}>{cardData.card.name}</Text>
+              <Text style={styles.info}>{cardData.collection.name}</Text>
+              <Text style={styles.infoLastUpdated}>Last updated: {format(new Date(cardData.card.last_updated), 'yyyy/MM/dd HH:mm')}</Text>
+              <View style={styles.pricesContainer}>
+                <Text style={styles.infoLowest}>
+                  R${cardData.card.lowest_price.toFixed(2)}
+                </Text>
+                <Text style={styles.info}>-</Text>
+                <Text style={styles.infoHighest}>
+                  R${cardData.card.highest_price.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.buttonContainer}>
+                <Button
+                  color="#eba410"
+                  title="Liga One Piece"
+                  onPress={() => handlePress(cardData.card.link_marketplace)}
+                />
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+
+      <View style={styles.pagination}>
+        {cardDetails.map((_, index) => (
+          <View
+            key={index}
+            style={[styles.dot, { opacity: index === activeIndex ? 1 : 0.5 }]}
           />
-          <Image source={{ uri: takenPhoto }} style={styles.image} />
-        </ScrollView>
-        <View style={styles.infoContainer}>
-          <Text style={styles.info}>{cardData.card.name}</Text>
-          <Text style={styles.info}>{cardData.collection.name}</Text>
-          <View style={styles.pricesContainer}>
-            <Text style={styles.infoLowest}>
-              R${cardData.card.lowest_price.toFixed(2)}
-            </Text>
-            <Text style={styles.info}>-</Text>
-            <Text style={styles.infoHighest}>
-              R$
-              {cardData.card.highest_price.toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.buttonContainer}>
-            <Button
-              color="#eba410"
-              title="Liga One Piece"
-              onPress={handlePress}
-            />
-            <Button
-              color="#6cb9df"
-              title="Done"
-              onPress={() => navigation.navigate("Home")}
-            />
-          </View>
-        </View>
+        ))}
+      </View>
+      <View style={styles.cardSum}>
+        <Text style={styles.info}>
+          Total of {cardDetails.length}{" "}
+          {cardDetails.length > 1 ? "cards" : "card"}:
+        </Text>
+        <Text style={styles.infoLowest}> R${totalLowestPrice}</Text>
+      </View>
+      <View style={styles.doneButton}>
+        <Button
+          color="#6cb9df"
+          title="Done"
+          onPress={() => navigation.navigate("Home")}
+        />
       </View>
     </ImageBackground>
   );
@@ -96,10 +142,14 @@ const styles = StyleSheet.create({
   backgroundImage: {
     opacity: 0.1,
   },
+  scrollContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   container: {
-    paddingVertical: 56,
+    marginTop: 200,
+    paddingVertical: 112,
     paddingHorizontal: 32,
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -121,12 +171,11 @@ const styles = StyleSheet.create({
     color: "green",
   },
   image: {
-    flex: 1,
     height: "100%",
     resizeMode: "contain",
   },
   infoContainer: {
-    flex: 4,
+    marginTop: 24,
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
@@ -135,6 +184,11 @@ const styles = StyleSheet.create({
   },
   info: {
     fontSize: 18,
+  },
+  infoLastUpdated: {
+    fontSize: 12,
+    opacity: 0.4,
+    paddingBottom: 12,
   },
   infoLowest: {
     fontSize: 18,
@@ -165,10 +219,35 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: "row",
+    alignContent: "center",
+    justifyContent: "center",
     gap: 36,
+  },
+  doneButton: {
+    marginBottom: 32,
+    alignContent: "center",
+    marginHorizontal: 64,
   },
   pricesContainer: {
     flexDirection: "row",
     gap: 16,
+  },
+  cardSum: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 24,
+  },
+  pagination: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  dot: {
+    height: 10,
+    width: 10,
+    backgroundColor: "#333",
+    borderRadius: 5,
+    marginHorizontal: 8,
   },
 });

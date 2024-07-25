@@ -38,30 +38,41 @@ export default function LoadingScreen({ route }) {
           }
         );
 
-        if (!classifyResponse.data) {
-          throw new Error("Card detection failed.");
+        console.log("Classifier API response: ", classifyResponse.data);
+
+        if (
+          !classifyResponse.data ||
+          classifyResponse.data["predictions"].length == 0
+        ) {
+          Alert.alert("Error", "Card classification failed.");
+          throw new Error("Card classification failed.");
+        } else {
+          // Obter detalhes das cartas detectadas
+          console.log("Chamando API do Mongo...");
+
+          const predictions = classifyResponse.data["predictions"];
+
+          const cardDetailsPromises = predictions.map(async (prediction) => {
+            const cardResponse = await axios.get(
+              `${FASTAPI_URL}${prediction.class}`
+            );
+            return { ...cardResponse.data, confidence: prediction.confidence };
+          });
+
+          const cardDetails = await Promise.all(cardDetailsPromises);
+
+          if (!cardDetails) {
+            throw new Error("Card information retrieval failed.");
+          }
+
+          console.log("Card Details:", cardDetails.length, "cards");
+
+          // Navegar para a tela de resultados com os dados da carta
+          navigation.navigate("Result", {
+            cardDetails: cardDetails,
+          });
         }
-
-        // Chamar a API do FastAPI PyMongo para obter os detalhes da carta
-        const cardResponse = await axios.get(
-          `${FASTAPI_URL}${classifyResponse.data["class"]}`
-        );
-
-        console.log(cardResponse);
-
-        console.log("\n\n");
-
-        console.log(cardResponse.data);
-
-        // Navegar para a tela de resultados com os dados da carta
-        navigation.navigate("Result", {
-          cardData: cardResponse.data,
-          takenPhoto: photoUri,
-          confidence: classifyResponse.data["confidence"],
-        });
       } catch (error) {
-        console.error("Error fetching data:", error);
-        Alert.alert("Erro", "Card detection failed.");
         navigation.navigate("Home");
       } finally {
         setLoading(false);
